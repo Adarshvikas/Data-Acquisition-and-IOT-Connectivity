@@ -1,0 +1,56 @@
+## before import the max6675, you must save the max6675.py file at "/usr/lib/python2.7/dist-packages"
+
+# wiring
+# Raspberry         MAX6675
+#       GND   ------   GND
+#        5V     ------   VCC
+#   pin 18     ------   SCK
+#   pin 22     ------   CS
+#   pin 16     ------   S
+import RPi.GPIO as GPIO
+import max6675
+import time
+import urllib.request
+
+# Set up GPIO mode and pin numbering
+GPIO.setmode(GPIO.BOARD)
+
+# Define thermocouple pins
+cs1 = 22
+sck = 18
+so = 16
+
+cs2 = 21
+cs3 = 23
+cs4 = 29
+# Initialize thermocouples
+max6675.set_pin(cs1, sck, so, 1)
+max6675.set_pin(cs2, sck, so, 1)
+max6675.set_pin(cs3, sck, so, 1)  # Using Celsius as the unit for thermocouple 3
+max6675.set_pin(cs4, sck, so, 1)  
+  # Using Celsius as the unit for thermocouple 1
+
+# ThingSpeak configuration
+APIKey = "73F4RQG9633ZJCNM"  # Replace with your ThingSpeak API Key
+baseURL = "https://api.thingspeak.com/update?api_key={}".format(APIKey)
+
+try:
+    while True:
+        # Read temperature from thermocouple
+        temp1 = max6675.read_temp(cs1, sck, so)
+        temp2 = max6675.read_temp(cs2, sck, so)
+        temp3 = max6675.read_temp(cs3, sck, so)
+        temp4 = max6675.read_temp(cs4, sck, so)
+        if temp1 is not None:
+            # Sending the reading to ThingSpeak
+            conn = urllib.request.urlopen(baseURL + "&field1={}".format(temp1))
+            print(conn.read())
+            conn.close()
+        else:
+            print("Error reading temperature from thermocouple.")
+       
+        # Sleep for 2 seconds before taking the next reading
+        time.sleep(2)
+
+except KeyboardInterrupt:
+    GPIO.cleanup()
