@@ -1,0 +1,103 @@
+import RPi.GPIO as GPIO
+import time
+import urllib.request
+
+GPIO.setmode(GPIO.BOARD)
+GPIO.setwarnings(False)
+
+# ThingSpeak configuration
+APIKey = "73F4RQG9633ZJCNM"  # Replace with your ThingSpeak API Key
+baseURL = "https://api.thingspeak.com/update?api_key={}".format(APIKey)
+
+# Function to set up pins for communication with MAX6675
+def set_pin(CS, SCK, SO):
+    GPIO.setup(CS, GPIO.OUT, initial=GPIO.HIGH)
+    GPIO.setup(SCK, GPIO.OUT, initial=GPIO.LOW)
+    GPIO.setup(SO, GPIO.IN)
+
+# Function to read temperature from MAX6675
+def read_temp(cs_no, sck, so, unit):
+    GPIO.output(cs_no, GPIO.LOW)
+    time.sleep(0.002)
+    GPIO.output(cs_no, GPIO.HIGH)
+    time.sleep(0.22)
+
+    GPIO.output(cs_no, GPIO.LOW)
+    GPIO.output(sck, GPIO.HIGH)
+    time.sleep(0.001)
+    GPIO.output(sck, GPIO.LOW)
+    value = 0
+    for i in range(11, -1, -1):
+        GPIO.output(sck, GPIO.HIGH)
+        value = value + (GPIO.input(so) * (2 ** i))
+        GPIO.output(sck, GPIO.LOW)
+
+    GPIO.output(sck, GPIO.HIGH)
+    error_tc = GPIO.input(so)
+    GPIO.output(sck, GPIO.LOW)
+
+    for i in range(2):
+        GPIO.output(sck, GPIO.HIGH)
+        time.sleep(0.001)
+        GPIO.output(sck, GPIO.LOW)
+
+    GPIO.output(cs_no, GPIO.HIGH)
+
+    if unit == 0:
+        temp = value
+    elif unit == 1:
+        temp = value * 0.25
+    elif unit == 2:
+        temp = value * 0.25 * 9.0 / 5.0 + 32.0
+
+    if error_tc != 0:
+        return -cs_no
+    else:
+        return temp
+
+# Define pins for thermocouples
+cs1 = 22
+sck1 = 18
+so1 = 16
+
+cs2 = 21
+sck2 = 19
+so2 = 15
+
+cs3 = 11
+sck3 = 12
+so3 = 13
+
+cs4 = 29
+sck4 = 31
+so4 = 32
+
+set_pin(cs1, sck1, so1)
+set_pin(cs2, sck2, so2)
+set_pin(cs3, sck3, so3)
+set_pin(cs4, sck4, so4)
+
+try:
+    while True:
+        # Read temperature from each thermocouple
+        temperature1 = read_temp(cs1, sck1, so1, 1)
+        print("Temperature 1:", temperature1)
+       
+        temperature2 = read_temp(cs2, sck2, so2, 1)
+        print("Temperature 2:", temperature2)
+       
+        temperature3 = read_temp(cs3, sck3, so3, 1)
+        print("Temperature 3:", temperature3)
+
+        temperature4 = read_temp(cs4, sck4, so4, 1)
+        print("Temperature 4:", temperature4)
+       # Sending the reading to ThingSpeak
+        conn = urllib.request.urlopen(baseURL + "&field1={}".format(temperature1))
+      #print(conn.read())
+        conn.close()
+
+        # Sleep for 2 seconds before taking the next reading
+        time.sleep(2)
+
+except KeyboardInterrupt:
+    GPIO.cleanup()
